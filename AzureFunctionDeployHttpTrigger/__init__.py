@@ -6,7 +6,7 @@ import os
 
 logger = logging.getLogger("SRE-AI-Engine.HTTP")
 
-http_trigger_bp = func.blueprint()
+http_trigger_bp = func.Blueprint()
 
 @http_trigger_bp.route(route="ai-webhook", methods=["POST"])
 @http_trigger_bp.queue_output(arg_name="azqueue", queue_name="grafana-alerts", connection="AzureWebJobsStorage")

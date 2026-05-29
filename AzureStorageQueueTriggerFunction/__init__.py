@@ -11,7 +11,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-queue_trigger_bp = func.blueprint()
+queue_trigger_bp = func.Blueprint()
 
 # Setup Logging
 logger = logging.getLogger("SRE-AI-Engine.Queue")
