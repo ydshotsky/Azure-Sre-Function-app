@@ -1,4 +1,5 @@
-name: Build and deploy Python project to Azure Function App - sre-ai-agent2
+```yaml
+name: Build and Deploy Python Azure Function App - sre-ai-agent2
 
 on:
   push:
@@ -7,45 +8,48 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' 
-  PYTHON_VERSION: '3.11' # Changed to 3.11 as it's highly stable on Azure Functions
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
+  PYTHON_VERSION: '3.11'
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
 
     steps:
+      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Setup Python
       - name: Setup Python version
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-       - name: 'Resolve Dependencies Using Pip'
-          shell: bash
-          run: |
-            pushd './'
-            python -m pip install --upgrade pip
-            pip install -r requirements.txt --target=".python_packages/lib/site-packages"
-            popd
+      # 3. Install dependencies
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt --target=".python_packages/lib/site-packages"
 
-      # 2. RBAC Authentication Handshake (REQUIRED BY YOUR ENVIRONMENT)
-        - name: Login to Azure
-          uses: azure/login@v2
-          with:
-            client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_72B7B1AF4F424A679B9F7DCB8442A84F }}
-            tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A9A0C7FE128C4A819C7EB1343B56078D }}
-            subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_86D0DE3E3F9A4348AA1EE771E9792237 }}
+      # 4. Azure Login using Service Principal / Federated Credentials
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_72B7B1AF4F424A679B9F7DCB8442A84F }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A9A0C7FE128C4A819C7EB1343B56078D }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_86D0DE3E3F9A4348AA1EE771E9792237 }}
 
-      # 3. Code Execution Push
-        - name: 'Deploy to Azure Functions'
-          uses: Azure/functions-action@v1
-          id: deploy-to-function
-          with:
-            app-name: 'sre-ai-agent2'
-            slot-name: 'Production'
-            package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+      # 5. Deploy Azure Function App
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1
+        id: deploy-to-function
+        with:
+          app-name: 'sre-ai-agent2'
+          slot-name: 'Production'
+          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+```
