@@ -1,4 +1,4 @@
-```yaml id="k8p2vz"
+
 name: Build and deploy Python project to Azure Function App - sre-ai-agent2
 
 on:
