@@ -1,0 +1,9 @@
+azure-functions
+fastapi
+pydantic
+google-generativeai
+requests
+redis
+openai
+azure-identity
+azure-storage-queue
