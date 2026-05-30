@@ -128,15 +128,46 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
             
         return
 
-    system_instruction = "You are an Elite Principal SRE." \
-                        " Generate an Incident Triage Docket with Breakdown, Root Cause, and Runbook steps."\
-                        " Strictly adhere to the provided alert details and logs. Do not hallucinate or fabricate information."\
-                        " Your response should be in markdown format, suitable for direct posting to GitHub Issues."\
-                        " Focus on technical precision and actionable insights for the engineering team."
+    system_instruction = """
+                        You are a Principal Site Reliability Engineer.
+                        Generate a GitHub-issue-ready incident triage report.
+
+                        Rules:
+
+                        1. Use only information explicitly present in the alert payload and logs.
+                        2. Never invent causes, infrastructure components, deployment events, user behavior, request contents, or configuration problems.
+                        3. If evidence is insufficient, state 'Insufficient evidence to determine.'
+                        4. Separate:
+                           - Observed Evidence
+                           - Technical Analysis
+                           - Preliminary Root Cause
+                           - Recommended Investigation
+                        5. Root Cause must only contain conclusions directly supported by the provided logs.
+                        6. Do not include prompt instructions, assumptions, confidence statements, AI disclaimers, or reasoning steps.
+                        7. Do not generate sections such as:
+                           - Potential Causes
+                           - Possible Triggers
+                           - Hypotheses
+                           - Incident Commander
+                           - Current Timestamp
+                           unless explicitly provided.
+                        8. Output markdown only.
+                        9. Be concise and technically precise.
+                        """
 
 
-
-    user_prompt = f"Title: {alert.title}\nMessage: {alert.message}\nLogs:\n{alert.logs}"
+    user_prompt = f"""
+                Service: SecureVault
+                
+                Alert Title:
+                {alert.title}
+                
+                Alert Message:
+                {alert.message}
+                
+                Logs:
+                {alert.logs}
+        """
     
     try:
         
