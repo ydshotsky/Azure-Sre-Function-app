@@ -164,7 +164,9 @@ def process_triage_queue(azqueue: func.QueueMessage):
     
     # 1. Extract the string payload back out of the queue message object
     raw_body = azqueue.get_body().decode('utf-8')
-    payload_dict = json.loads(raw_body)
+    logger.error(f"RAW BODY = {repr(raw_body)}")
+    return
+    # payload_dict = json.loads(raw_body)
     
     # 2. Safely map it to your structural verification contracts
     payload = GrafanaAlertPayload(**payload_dict)
