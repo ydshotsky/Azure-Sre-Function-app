@@ -165,14 +165,14 @@ def process_triage_queue(azqueue: func.QueueMessage):
     # 1. Extract the string payload back out of the queue message object
     raw_body = azqueue.get_body().decode('utf-8')
     logger.error(f"RAW BODY = {repr(raw_body)}")
-    return
-    # payload_dict = json.loads(raw_body)
-    
-    # 2. Safely map it to your structural verification contracts
+
+    payload_dict = json.loads(raw_body)
+    logger.error(f"PAYLOAD DICT = {payload_dict}")
+
     payload = GrafanaAlertPayload(**payload_dict)
-    
-    # 3. Run your intensive 10-second AI execution logic safely!
-    # Azure allows queue triggers to run for up to 5-10 minutes without interruption.
+    logger.error("PYDANTIC VALIDATION PASSED")
+
     execute_intelligent_triage(payload)
+    logger.error("AI EXECUTION PASSED")
     
     logger.info("GitHub issue creation pipeline completed successfully.")
