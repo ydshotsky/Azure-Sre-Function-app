@@ -74,12 +74,13 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json"
     }
-
+    logger.warning(f"Generated error fingerprint: {error_hash} for alert titled '{alert.title}'")
     if existing_issue_id:
         try:
             comment_cache_key = f"incident:comment:{error_hash}"
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             existing_comment_meta = cache.get(comment_cache_key)
+            logger.warning(f"Existing active issue #{existing_issue_id} found for this fingerprint. Updating deduplication metrics.")
             
             if not existing_comment_meta:
                 # First time seeing a duplicate! Create the single tracking comment.
@@ -87,6 +88,7 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
                 body_data = {
                     "body": f"🔄 **Deduplication Metrics**\n- **Total Occurrences:** `2`\n- **Last Detected Active:** `{current_time}`"
                 }
+                
                 res = requests.post(comment_url, json=body_data, headers=headers)
                 if res.status_code == 201:
                     comment_id = res.json().get("id")
@@ -94,6 +96,8 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
                     meta_payload = {"comment_id": comment_id, "count": 2}
                     cache.setex(comment_cache_key, 600, json.dumps(meta_payload))
                     logger.info("Initialized unified deduplication comment thread.")
+                else:
+                    logger.error(f"Failed to create deduplication comment: {res}")
             else:
                 # Subsequent duplicates! Parse metadata, increment counter, and EDIT the comment.
                 meta = json.loads(existing_comment_meta)
@@ -104,8 +108,15 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
                 edit_url = f"https://api.github.com/repos/{GITHUB_REPO}/issues/comments/{target_comment_id}"
                 updated_body = {
                     "body": f"🔄 **Deduplication Metrics**\n- **Total Occurrences:** `{new_count}`\n- **Last Detected Active:** `{current_time}`"
+                
                 }
-                requests.patch(edit_url, json=updated_body, headers=headers)
+            
+                response = requests.patch(edit_url, json=updated_body, headers=headers)
+                if(response.status_code == 200):
+                    logger.info(f"Successfully updated deduplication comment for issue #{existing_issue_id} with new count {new_count}.")
+                else:                    logger.error(f"Failed to update deduplication comment: {response}")
+                # requests.patch(edit_url, json=updated_body, headers=headers)
+
             
                 # Update local cache values with incremented metrics
                 meta["count"] = new_count
@@ -136,6 +147,7 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
             generation_config=genai.types.GenerationConfig(temperature=0.1)
         )
         ai_diagnostic_markdown = response.text
+        logger.warning(f"ai diagnostic markdown = {ai_diagnostic_markdown}")
         
         # Build payload and ship to GitHub Issues API
         url = f"https://api.github.com/repos/{GITHUB_REPO}/issues"
@@ -152,6 +164,8 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
             # Cache the GitHub Issue ID with a 10-minute (600 seconds) cooling window
             cache.setex(cache_key, 600, str(new_issue_id))
             logger.info(f"New tracking issue #{new_issue_id} established and cached successfully.")
+        else:
+            logger.error(f"GitHub Issue creation failed with status {response}")
             
     except Exception as e:
         logger.error(f"SRE execution workflow failed: {str(e)}")
