@@ -168,10 +168,10 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
         else:
             logger.error(f"GitHub Status Code: {response.status_code}")
             logger.error(f"GitHub Response Body: {response.text}")
-            logger.error(f"GitHub Response Headers: {response.headers}")
-            logger.error(f"GITHUB_REPO={GITHUB_REPO}")
-            logger.error(f"Token present={bool(GITHUB_TOKEN)}")
-            logger.error(f"Token length={len(GITHUB_TOKEN) if GITHUB_TOKEN else 0}")
+            logger.error(f"Token starts with: {GITHUB_TOKEN[:8]}")
+            logger.error(f"Token length={len(GITHUB_TOKEN)}")
+            logger.error(f"Last char={repr(GITHUB_TOKEN[-1])}")   
+    
     except Exception as e:
         logger.error(f"SRE execution workflow failed: {str(e)}")
 
