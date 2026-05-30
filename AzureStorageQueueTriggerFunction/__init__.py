@@ -1,5 +1,6 @@
 import logging
-import json 
+import json
+from urllib import response 
 import azure.functions as func
 import os
 import google.generativeai as genai
@@ -165,8 +166,12 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
             cache.setex(cache_key, 600, str(new_issue_id))
             logger.info(f"New tracking issue #{new_issue_id} established and cached successfully.")
         else:
-            logger.error(f"GitHub Issue creation failed with status {response}")
-            
+            logger.error(f"GitHub Status Code: {response.status_code}")
+            logger.error(f"GitHub Response Body: {response.text}")
+            logger.error(f"GitHub Response Headers: {response.headers}")
+            logger.error(f"GITHUB_REPO={GITHUB_REPO}")
+            logger.error(f"Token present={bool(GITHUB_TOKEN)}")
+            logger.error(f"Token length={len(GITHUB_TOKEN) if GITHUB_TOKEN else 0}")
     except Exception as e:
         logger.error(f"SRE execution workflow failed: {str(e)}")
 
