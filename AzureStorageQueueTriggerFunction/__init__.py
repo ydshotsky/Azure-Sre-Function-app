@@ -12,6 +12,16 @@ from pydantic import BaseModel, Field
 
 
 queue_trigger_bp = func.Blueprint()
+test_bp = func.Blueprint()
+
+@test_bp.function_name(name="test_queue")
+@test_bp.queue_trigger(
+    arg_name="msg",
+    queue_name="testqueue",
+    connection="AzureWebJobsStorage"
+)
+def test_queue(msg: func.QueueMessage):
+    logging.warning("TEST QUEUE FIRED")
 
 # Setup Logging
 logger = logging.getLogger("SRE-AI-Engine.Queue")
