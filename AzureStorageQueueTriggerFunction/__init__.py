@@ -169,10 +169,18 @@ def process_triage_queue(azqueue: func.QueueMessage):
     payload_dict = json.loads(raw_body)
     logger.error(f"PAYLOAD DICT = {payload_dict}")
 
-    payload = GrafanaAlertPayload(**payload_dict)
-    logger.error("PYDANTIC VALIDATION PASSED")
+    try:
+        payload = GrafanaAlertPayload(**payload_dict)
+        logger.error("PYDANTIC VALIDATION PASSED")
+    except Exception as e:
+        logger.error(f"PYDANTIC VALIDATION FAILED: {str(e)}")
+        return   
 
-    execute_intelligent_triage(payload)
-    logger.error("AI EXECUTION PASSED")
+    try:
+        execute_intelligent_triage(payload)
+        logger.error("AI EXECUTION PASSED")
+    except Exception as e:
+        logger.exception("AI EXECUTION FAILED")
+        return
     
     logger.info("GitHub issue creation pipeline completed successfully.")
