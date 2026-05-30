@@ -163,11 +163,16 @@ def process_triage_queue(azqueue: func.QueueMessage):
     logger.info("Background queue worker activated by incoming telemetry item.")
     
     # 1. Extract the string payload back out of the queue message object
+    
     raw_body = azqueue.get_body().decode('utf-8')
     logger.error(f"RAW BODY = {repr(raw_body)}")
 
-    payload_dict = json.loads(raw_body)
-    logger.error(f"PAYLOAD DICT = {payload_dict}")
+    try:
+        payload_dict = json.loads(raw_body)
+        logger.error(f"PAYLOAD DICT = {payload_dict}")
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to decode JSON: {str(e)}")
+        return
 
     try:
         payload = GrafanaAlertPayload(**payload_dict)
