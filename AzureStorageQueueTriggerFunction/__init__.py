@@ -218,18 +218,35 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
 
 
     user_prompt = f"""
-                Service: SecureVault
-                
-                Alert Title:
-                {alert.title}
-                
-                Alert Message:
-                {alert.message}
-                
-                Logs:
-                {scrubbed_logs}
-        """
-    
+                        Use EXACTLY this structure.
+
+                        # Incident Summary
+
+                        ## Observed Evidence
+                        - ...
+
+                        ## Technical Analysis
+                        - ...
+
+                        ## Preliminary Root Cause
+                        - Only include facts directly proven by logs.
+                        - If not proven, write:
+                          Insufficient evidence to determine.
+
+                        ## Recommended Investigation
+                        - ...
+
+                        Do not add any other sections.
+
+                        Alert:
+                        {alert.title}
+
+                        Message:
+                        {alert.message}
+
+                        Logs:
+                        {alert.logs}
+                        """
     try:
         
         genai.configure(api_key=AI_API_KEY) # type: ignore
