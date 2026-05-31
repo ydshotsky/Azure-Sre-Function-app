@@ -103,6 +103,7 @@ else:
     )
 
 class GrafanaAlertPayload(BaseModel):
+    service: str = Field(default="unknown")
     status: str = Field("...", examples=["firing"])
     title: str = Field(..., examples=["HTTP 5xx Error Spike Detected"])
     message: str = Field(..., examples=["SecureVault instance replica-a throwing NullPointerException at core login filter."])
@@ -120,23 +121,23 @@ def generate_error_fingerprint(title: str, logs: str) -> str:
     raw_signature = f"{title}|||{logs}"
     return hashlib.sha256(raw_signature.encode('utf-8')).hexdigest()
 
-def execute_intelligent_triage(alert: GrafanaAlertPayload):
+def execute_intelligent_triage(ai_payload: dict):
     # 1. Compute the structural signature fingerprint
     AI_API_KEY = os.getenv("AI_API_KEY", os.getenv("AI_API_KEY"))
     AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemma-4-26b")
     QUEUE_SERVICE_URI = os.getenv("AzureWebJobsStorage__queueServiceUri")
-    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
     GITHUB_REPO = os.getenv("GITHUB_REPO")
-    scrubbed_logs = sanitize_logs(alert.logs)
+    scrubbed_logs = sanitize_logs(ai_payload["logs"])
 
-    error_hash = generate_error_fingerprint(alert.title, scrubbed_logs)
+    error_hash = generate_error_fingerprint(ai_payload["title"], scrubbed_logs)
     cache_key = f"incident:active:{error_hash}"
     existing_issue_id = cache.get(cache_key)
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json"
     }
-    logger.warning(f"Generated error fingerprint: {error_hash} for alert titled '{alert.title}'")
+    logger.warning(f"Generated error fingerprint: {error_hash} for alert titled '{ai_payload['title']}'")
     if existing_issue_id:
         try:
             comment_cache_key = f"incident:comment:{error_hash}"
@@ -162,7 +163,7 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
                     logger.error(f"Failed to create deduplication comment: {res}")
             else:
                 # Subsequent duplicates! Parse metadata, increment counter, and EDIT the comment.
-                meta = json.loads(existing_comment_meta)
+                meta = json.loads(str(existing_comment_meta))
                 target_comment_id = meta["comment_id"]
                 new_count = meta["count"] + 1
             
@@ -239,13 +240,13 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
                         Do not add any other sections.
 
                         Alert:
-                        {alert.title}
+                        {ai_payload.get('title', '')}
 
                         Message:
-                        {alert.message}
+                        {ai_payload.get('message', '')}
 
                         Logs:
-                        {alert.logs}
+                        {ai_payload.get('logs', '')}
                         """
     try:
         
@@ -262,7 +263,7 @@ def execute_intelligent_triage(alert: GrafanaAlertPayload):
         # Build payload and ship to GitHub Issues API
         url = f"https://api.github.com/repos/{GITHUB_REPO}/issues"
         issue_data = {
-            "title": f"🚨 [INCIDENT] {alert.title}",
+            "title": f"🚨 [INCIDENT] {ai_payload.get('title', '')}",
             "body": f"### Fingerprint: `{error_hash}`\n\n{ai_diagnostic_markdown}",
             "labels": ["bug", "automated-triage"]
         }
@@ -294,7 +295,7 @@ def process_triage_queue(azqueue: func.QueueMessage):
     
     raw_body = azqueue.get_body().decode('utf-8')
     logger.error(f"RAW BODY = {repr(raw_body)}")
-
+    
     try:
         payload_dict = json.loads(raw_body)
         logger.error(f"PAYLOAD DICT = {payload_dict}")
@@ -303,14 +304,23 @@ def process_triage_queue(azqueue: func.QueueMessage):
         return
 
     try:
-        payload = GrafanaAlertPayload(**payload_dict)
+        alert = payload_dict["alerts"][0]
+
+        ai_payload = {
+            "service": alert["labels"].get("service_name", "unknown"),
+            "status": alert.get("status", "unknown"),
+            "title": alert["annotations"].get("title", "No Title"),
+            "message": alert["annotations"].get("message", "No Message"),
+            "logs": alert["annotations"].get("logs", "No additional traceback available.")
+        }
+        payload = GrafanaAlertPayload(**ai_payload)
         logger.error("PYDANTIC VALIDATION PASSED")
     except Exception as e:
         logger.error(f"PYDANTIC VALIDATION FAILED: {str(e)}")
         return   
 
     try:
-        execute_intelligent_triage(payload)
+        execute_intelligent_triage(ai_payload)
         logger.error("AI EXECUTION PASSED")
     except Exception as e:
         logger.exception("AI EXECUTION FAILED")
