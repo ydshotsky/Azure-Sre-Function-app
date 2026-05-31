@@ -2,6 +2,7 @@ import azure.functions as func
 import logging
 import json
 import os
+import secrets
 
 
 logger = logging.getLogger("SRE-AI-Engine.HTTP")
