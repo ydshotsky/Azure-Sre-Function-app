@@ -37,14 +37,18 @@ def execute_intelligent_triage(ai_payload: dict):
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json"
     }
-    logger.warning(f"Generated error fingerprint: {error_hash} for alert titled '{ai_payload['title']}'")
+cd "E:\hk\gith\Azure Serverless Ai Agent" && git add . && git commit -m "Fix: Enhance logs validation and reject Grafana placeholders, refresh cache TTL on duplicates"cd "E:\hk\gith\Azure Serverless Ai Agent" && git add . && git commit -m "Fix: Enhance logs validation and reject Grafana placeholders, refresh cache TTL on duplicates"    logger.info(f"Generated error fingerprint: {error_hash} for alert titled '{ai_payload['title']}'")
     if existing_issue_id:
         try:
             comment_cache_key = f"incident:comment:{error_hash}"
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             existing_comment_meta = cache.get(comment_cache_key)
-            logger.warning(f"Existing active issue #{existing_issue_id} found for this fingerprint. Updating deduplication metrics.")
-            
+            logger.info(f"Existing active issue #{existing_issue_id} found for this fingerprint. Updating deduplication metrics.")
+
+            # Refresh the incident cache TTL on every duplicate occurrence
+            cache.setex(cache_key, 600, str(existing_issue_id))
+            logger.debug(f"Refreshed incident cache TTL (10 mins) for fingerprint {error_hash}")
+
             if not existing_comment_meta:
                 # First time seeing a duplicate! Create the single tracking comment.
                 comment_url = f"https://api.github.com/repos/{GITHUB_REPO}/issues/{existing_issue_id}/comments"
@@ -77,8 +81,8 @@ def execute_intelligent_triage(ai_payload: dict):
                 response = requests.patch(edit_url, json=updated_body, headers=headers)
                 if(response.status_code == 200):
                     logger.info(f"Successfully updated deduplication comment for issue #{existing_issue_id} with new count {new_count}.")
-                else:                    logger.error(f"Failed to update deduplication comment: {response}")
-                # requests.patch(edit_url, json=updated_body, headers=headers)
+                else:
+                    logger.error(f"Failed to update deduplication comment: {response}")
 
             
                 # Update local cache values with incremented metrics
@@ -158,8 +162,8 @@ def execute_intelligent_triage(ai_payload: dict):
             generation_config=genai.types.GenerationConfig(temperature=0.1)
         )
         ai_diagnostic_markdown = response.text
-        logger.warning(f"ai diagnostic markdown = {ai_diagnostic_markdown}")
-        
+        logger.info(f"AI diagnostic report generated successfully ({len(ai_diagnostic_markdown)} chars)")
+
         # Build payload and ship to GitHub Issues API
         url = f"https://api.github.com/repos/{GITHUB_REPO}/issues"
         issue_data = {

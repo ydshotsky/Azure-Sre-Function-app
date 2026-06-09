@@ -37,8 +37,29 @@ class GrafanaAlertPayload(BaseModel):
     logs: str = Field(default="No additional traceback available.", examples=["Caused by: java.lang.NullPointerException at SecurityFilter.java:42"])
 
 def ai_payload_logs_validation(logs: str) -> bool:
+    """
+    Validate that logs contain actual content.
+    Reject empty logs, whitespace, and Grafana placeholders like '[no value]'
+    """
     if not logs or logs.strip() == "":
         return False
+
+    # Reject common placeholder values from Grafana
+    placeholder_values = [
+        "[no value]",
+        "no value",
+        "null",
+        "none",
+        "n/a",
+        "unknown",
+        "..."
+    ]
+
+    normalized_logs = logs.strip().lower()
+    for placeholder in placeholder_values:
+        if normalized_logs == placeholder:
+            return False
+
     return True
 
     
@@ -50,13 +71,13 @@ def process_triage_queue(azqueue: func.QueueMessage):
     # 1. Extract the string payload back out of the queue message object
     
     raw_body = azqueue.get_body().decode('utf-8')
-    logger.error(f"RAW BODY = {repr(raw_body)}")
-    
+    logger.debug(f"Received queue message: {repr(raw_body[:200])}")  # Log first 200 chars only
+
     try:
         payload_dict = json.loads(raw_body)
-        logger.error(f"PAYLOAD DICT = {payload_dict}")
+        logger.debug(f"Successfully parsed JSON payload")
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to decode JSON: {str(e)}")
+        logger.error(f"Failed to decode JSON payload: {str(e)}")
         return
 
     try:
@@ -69,21 +90,25 @@ def process_triage_queue(azqueue: func.QueueMessage):
             "message": alert["annotations"].get("message", "No Message"),
             "logs": alert["annotations"].get("logs", "No additional traceback available.")
         }
+
         if not ai_payload_logs_validation(ai_payload["logs"]):
-            logger.error("No logs in payload. Aborting processing.")
+            logger.warning(f"Alert rejected: No valid logs in payload. Logs value: '{ai_payload['logs']}'")
             return
         
         payload = GrafanaAlertPayload(**ai_payload)
-        logger.error("PYDANTIC VALIDATION PASSED")
+        logger.info("Payload validation successful, proceeding to AI triage execution")
+    except KeyError as e:
+        logger.error(f"Missing required field in payload: {str(e)}")
+        return
     except Exception as e:
-        logger.error(f"PYDANTIC VALIDATION FAILED: {str(e)}")
-        return   
+        logger.error(f"Payload validation failed: {str(e)}")
+        return
 
     try:
         execute_intelligent_triage(ai_payload)
-        logger.error("AI EXECUTION PASSED")
+        logger.info("AI execution triage completed successfully")
     except Exception as e:
-        logger.exception("AI EXECUTION FAILED")
+        logger.exception("AI execution triage failed with error")
         return
     
     logger.info("GitHub issue creation pipeline completed successfully.")
